@@ -1,78 +1,73 @@
-MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-PROJECT_DIR := $(dir $(MAKEFILE_PATH))
+# Makefile
+.PHONY: help setup start stop logs test lint clean health
 
-.PHONY: help setup build start stop clean test lint
+# Default target
+help:
+	@echo "Available commands:"
+	@echo "  setup     - Complete development setup"
+	@echo "  start     - Start all services with Docker"
+	@echo "  stop      - Stop all services"
+	@echo "  logs      - View service logs"
+	@echo "  test      - Run all tests"
+	@echo "  lint      - Run all linters"
+	@echo "  clean     - Clean up Docker resources"
+	@echo "  health    - Check service health"
+	@echo "  agents-dev - Run agents in development mode"
 
-help: ## Show this help message
-	@echo 'Usage: make [target]'
-	@echo ''
-	@echo 'Targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-
-setup: ## Setup development environment
-	@echo "Setting up development environment..."
+# Complete setup
+setup: 
+	@echo "Setting up Job Application Tracker..."
 	@chmod +x setup-dev.sh
 	@./setup-dev.sh
 
-build: ## Build all services
-	@echo "Building all services..."
-	@docker-compose build
+# Docker operations
+start:
+	docker-compose up -d postgres redis agents
 
-start: ## Start all services
-	@echo "Starting all services..."
-	@docker-compose up -d
+start-all:
+	docker-compose --profile frontend --profile backend up -d
 
-stop: ## Stop all services
-	@echo "Stopping all services..."
-	@docker-compose down
+stop:
+	docker-compose down
 
-clean: ## Clean up containers, images, and volumes
-	@echo "Cleaning up..."
-	@docker-compose down -v --rmi all --remove-orphans
+logs:
+	docker-compose logs -f
 
-logs: ## Show logs from all services
-	@docker-compose logs -f
+# Development
+agents-dev:
+	cd agents && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt && python main.py
 
-backend-dev: ## Run backend in development mode
-	@echo "Starting backend in development mode..."
-	@cd backend && go run cmd/server/main.go
+backend-dev:
+	cd backend && go mod tidy && go run cmd/server/main.go
 
-frontend-dev: ## Run frontend in development mode
-	@echo "Starting frontend in development mode..."
-	@cd frontend && npm run dev
+frontend-dev:
+	cd frontend && npm install && npm run dev
 
-agents-dev: ## Run agents in development mode
-	@echo "Starting agents in development mode..."
-	@cd agents && source venv/bin/activate && python main.py
-
-test: ## Run tests for all services
+# Testing and quality
+test:
 	@echo "Running tests..."
-	@cd backend && go test ./...
-	@cd agents && source venv/bin/activate && pytest
-	@cd frontend && npm test
+	cd agents && python -m pytest tests/ -v
+	cd backend && go test ./...
+	cd frontend && npm test
 
-lint: ## Run linters for all services
+lint:
 	@echo "Running linters..."
-	@cd backend && go fmt ./...
-	@cd frontend && npm run lint
-	@cd agents && source venv/bin/activate && black . && flake8
+	cd agents && flake8 src/ --max-line-length=100
+	cd backend && golangci-lint run
+	cd frontend && npm run lint
 
-install-deps: ## Install dependencies for all services
-	@echo "Installing backend dependencies..."
-	@cd backend && go mod tidy
-	@echo "Installing frontend dependencies..."
-	@cd frontend && npm install
-	@echo "Installing agent dependencies..."
-	@cd agents && source venv/bin/activate && pip install -r requirements.txt
+# Maintenance
+clean:
+	docker-compose down -v
+	docker system prune -f
 
-db-reset: ## Reset the database
-	@echo "Resetting database..."
-	@docker-compose down postgres
-	@docker volume rm job-application-tracker_postgres_data || true
-	@docker-compose up -d postgres
+db-reset:
+	docker-compose down postgres
+	docker volume rm jobtracker_postgres_data
+	docker-compose up -d postgres
 
-health: ## Check health of all services
+health:
 	@echo "Checking service health..."
-	@curl -f http://localhost:8080/health || echo "Backend unhealthy"
-	@curl -f http://localhost:8000/health || echo "Agents unhealthy"
-	@curl -f http://localhost:3000 || echo "Frontend unhealthy"
+	@curl -f http://localhost:8000/health || echo "Agents service down"
+	@curl -f http://localhost:8080/health || echo "Backend service down"
+	@curl -f http://localhost:3000 || echo "Frontend service down"

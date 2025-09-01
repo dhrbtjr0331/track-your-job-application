@@ -1,80 +1,82 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://backend:8080
-      - REACT_APP_WS_URL=ws://backend:8080/ws
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgresql://user:password@postgres:5432/jobtracker
-      - REDIS_URL=redis://redis:6379
-      - GMAIL_CREDENTIALS_PATH=/app/credentials/gmail_credentials.json
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - AGENTS_SERVICE_URL=http://agents:8000
-    volumes:
-      - ./backend:/app
-      - ./shared:/app/shared
-      - ./credentials:/app/credentials:ro
-    depends_on:
-      - postgres
-      - redis
-      - agents
-
-  agents:
-    build:
-      context: ./agents
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GMAIL_CREDENTIALS_PATH=/app/credentials/gmail_credentials.json
-      - DATABASE_URL=postgresql://user:password@postgres:5432/jobtracker
-      - REDIS_URL=redis://redis:6379
-    volumes:
-      - ./agents:/app
-      - ./shared:/app/shared
-      - ./credentials:/app/credentials:ro
-    depends_on:
-      - postgres
-      - redis
-
+  # PostgreSQL Database
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: jobtracker_postgres
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
       POSTGRES_DB: jobtracker
+      POSTGRES_USER: jobtracker
+      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  # Redis for caching
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    container_name: jobtracker_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
 
+  # Python Agents Service
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: jobtracker_agents
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./outputs:/app/outputs
+      - ./credentials:/app/credentials
+    depends_on:
+      - postgres
+      - redis
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Go Backend (when ready)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobtracker_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://jobtracker:password@postgres:5432/jobtracker
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    profiles:
+      - backend
+
+  # React Frontend (when ready)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jobtracker_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_AGENTS_URL=http://localhost:8000
+    depends_on:
+      - backend
+    profiles:
+      - frontend
+
 volumes:
   postgres_data:
   redis_data:
+  

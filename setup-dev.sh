@@ -1,91 +1,124 @@
+# setup-dev.sh
 #!/bin/bash
 
-# Job Application Tracker - Development Setup Script
-
-set -e
-
-echo "🚀 Setting up Job Application Tracker development environment..."
+echo "🚀 Setting up Job Application Tracker Development Environment"
 
 # Check if required tools are installed
-check_tool() {
-    if ! command -v $1 &> /dev/null; then
-        echo "❌ $1 is not installed. Please install $1 and try again."
-        exit 1
+check_requirements() {
+    echo "📋 Checking requirements..."
+    
+    command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required but not installed. Aborting." >&2; exit 1; }
+    command -v docker-compose >/dev/null 2>&1 || { echo "❌ Docker Compose is required but not installed. Aborting." >&2; exit 1; }
+    command -v python3 >/dev/null 2>&1 || { echo "❌ Python 3 is required but not installed. Aborting." >&2; exit 1; }
+    command -v go >/dev/null 2>&1 || echo "⚠️  Go is not installed. Backend development won't work."
+    command -v node >/dev/null 2>&1 || echo "⚠️  Node.js is not installed. Frontend development won't work."
+    
+    echo "✅ Requirements check completed"
+}
+
+# Setup environment
+setup_environment() {
+    echo "⚙️  Setting up environment..."
+    
+    # Create .env file if it doesn't exist
+    if [ ! -f .env ]; then
+        cp .env.example .env
+        echo "📄 Created .env file from template"
+        echo "⚠️  Please edit .env and add your API keys!"
+    fi
+    
+    # Create necessary directories
+    mkdir -p outputs
+    mkdir -p credentials
+    mkdir -p logs
+    
+    echo "📁 Created necessary directories"
+}
+
+# Setup Python agents
+setup_agents() {
+    echo "🐍 Setting up Python agents..."
+    
+    cd agents
+    
+    # Create virtual environment
+    python3 -m venv venv
+    source venv/bin/activate
+    
+    # Upgrade pip
+    pip install --upgrade pip
+    
+    # Install requirements
+    pip install -r requirements.txt
+    
+    echo "✅ Python agents setup completed"
+    cd ..
+}
+
+# Setup Go backend (if Go is available)
+setup_backend() {
+    if command -v go >/dev/null 2>&1; then
+        echo "🏗️  Setting up Go backend..."
+        cd backend
+        go mod tidy
+        echo "✅ Go backend setup completed"
+        cd ..
     else
-        echo "✅ $1 is installed"
+        echo "⚠️  Skipping Go backend setup (Go not installed)"
     fi
 }
 
-echo "🔍 Checking required tools..."
-check_tool "go"
-check_tool "python3"
-check_tool "node"
-check_tool "docker"
-check_tool "docker-compose"
+# Setup React frontend (if Node is available)  
+setup_frontend() {
+    if command -v node >/dev/null 2>&1; then
+        echo "⚛️  Setting up React frontend..."
+        cd frontend
+        npm install
+        echo "✅ React frontend setup completed"
+        cd ..
+    else
+        echo "⚠️  Skipping React frontend setup (Node.js not installed)"
+    fi
+}
 
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo "📝 Creating .env file from template..."
-    cp .env.example .env
-    echo "⚠️  Please edit .env file with your actual API keys and configuration"
-else
-    echo "✅ .env file already exists"
-fi
+# Setup Docker services
+setup_docker() {
+    echo "🐳 Setting up Docker services..."
+    
+    # Start databases
+    docker-compose up -d postgres redis
+    
+    # Wait for databases to be ready
+    echo "⏳ Waiting for databases to be ready..."
+    sleep 10
+    
+    echo "✅ Docker services setup completed"
+}
 
-# Setup backend
-echo "🔧 Setting up Go backend..."
-cd backend
-if [ ! -f go.sum ]; then
-    go mod tidy
-fi
-cd ..
+# Main setup flow
+main() {
+    check_requirements
+    setup_environment
+    setup_agents
+    setup_backend
+    setup_frontend
+    setup_docker
+    
+    echo ""
+    echo "🎉 Setup completed successfully!"
+    echo ""
+    echo "📋 Next steps:"
+    echo "1. Edit .env file and add your API keys"
+    echo "2. Add Gmail credentials to credentials/ directory"
+    echo "3. Start the agents service: make agents-dev"
+    echo "4. Test the setup: curl http://localhost:8000/health"
+    echo ""
+    echo "📚 Available commands:"
+    echo "  make help     - Show all available commands"
+    echo "  make start    - Start all services"
+    echo "  make logs     - View service logs"
+    echo ""
+    echo "Happy coding! 🚀"
+}
 
-# Setup frontend
-echo "🎨 Setting up React frontend..."
-cd frontend
-if [ ! -d node_modules ]; then
-    npm install
-fi
-cd ..
-
-# Setup agents
-echo "🤖 Setting up Python agents..."
-cd agents
-if [ ! -d venv ]; then
-    python3 -m venv venv
-fi
-source venv/bin/activate
-pip install -r requirements.txt
-deactivate
-cd ..
-
-# Create necessary directories
-echo "📁 Creating necessary directories..."
-mkdir -p outputs/excel
-mkdir -p outputs/logs
-mkdir -p outputs/exports
-mkdir -p credentials
-
-# Database setup
-echo "🗄️ Setting up database..."
-docker-compose up -d postgres redis
-
-# Wait for database to be ready
-echo "⏳ Waiting for database to be ready..."
-sleep 10
-
-echo "✅ Setup complete!"
-echo ""
-echo "🎯 Next steps:"
-echo "1. Edit the .env file with your API keys"
-echo "2. Add Gmail API credentials to credentials/gmail_credentials.json"
-echo "3. Run 'docker-compose up -d' to start all services"
-echo "4. Or run individual services:"
-echo "   - Backend: cd backend && go run cmd/server/main.go"
-echo "   - Frontend: cd frontend && npm run dev"
-echo "   - Agents: cd agents && source venv/bin/activate && python main.py"
-echo ""
-echo "🌐 Application will be available at:"
-echo "   - Frontend: http://localhost:3000"
-echo "   - Backend: http://localhost:8080"
-echo "   - Agents: http://localhost:8000"
+main

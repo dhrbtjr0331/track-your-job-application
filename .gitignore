@@ -68,3 +68,5 @@ outputs/
 *.xlsx
 *.xls
 *.csv
+
+agents/venv
