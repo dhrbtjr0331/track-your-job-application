@@ -1,0 +1,125 @@
+scalar Time
+scalar Upload
+
+# Application represents a job application entry
+type Application {
+  id: ID!
+  company: String!
+  position: String!
+  appliedDate: String!
+  status: String!
+  source: String!
+  location: String
+  jobId: String
+  statusLink: String
+  notes: String
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+# Input for creating/updating applications
+input ApplicationInput {
+  company: String!
+  position: String!
+  appliedDate: String!
+  status: String!
+  source: String!
+  location: String
+  jobId: String
+  statusLink: String
+  notes: String
+}
+
+# Processing request input
+input ProcessingRequest {
+  startDate: String!
+  endDate: String
+  outputPath: String!
+  overwriteExisting: Boolean = false
+}
+
+# Processing result type
+type ProcessingResult {
+  success: Boolean!
+  message: String!
+  filePath: String
+  applicationsFound: Int!
+  applicationsProcessed: Int!
+  errors: [String!]
+}
+
+# Processing status for real-time updates
+type ProcessingUpdate {
+  stage: String!
+  progress: Int!
+  message: String!
+  currentAgent: String
+  error: String
+}
+
+# User type for authentication
+type User {
+  id: ID!
+  email: String!
+  name: String
+  pictureUrl: String
+}
+
+# Auth result
+type AuthResult {
+  success: Boolean!
+  user: User
+  message: String
+}
+
+type Query {
+  # Get applications for the authenticated user
+  applications(
+    startDate: String
+    endDate: String
+    status: String
+    company: String
+    limit: Int = 50
+    offset: Int = 0
+  ): [Application!]!
+  
+  # Get a specific application by ID
+  application(id: ID!): Application
+  
+  # Get user profile
+  me: User
+  
+  # Get processing job status
+  processingStatus(jobId: ID!): ProcessingUpdate
+  
+  # Health check
+  health: String!
+}
+
+type Mutation {
+  # Process applications from Gmail
+  processApplications(input: ProcessingRequest!): ProcessingResult!
+  
+  # Create a new application manually
+  createApplication(input: ApplicationInput!): Application!
+  
+  # Update an existing application
+  updateApplication(id: ID!, input: ApplicationInput!): Application!
+  
+  # Delete an application
+  deleteApplication(id: ID!): Boolean!
+  
+  # Cancel a processing job
+  cancelProcessing(jobId: ID!): Boolean!
+}
+
+type Subscription {
+  # Subscribe to processing updates
+  processingUpdates(jobId: ID!): ProcessingUpdate!
+  
+  # Subscribe to new applications
+  applicationCreated: Application!
+  
+  # Subscribe to application updates
+  applicationUpdated: Application!
+}

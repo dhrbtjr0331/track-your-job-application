@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://backend:8080
+      - REACT_APP_WS_URL=ws://backend:8080/ws
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/jobtracker
+      - REDIS_URL=redis://redis:6379
+      - GMAIL_CREDENTIALS_PATH=/app/credentials/gmail_credentials.json
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENTS_SERVICE_URL=http://agents:8000
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+      - ./credentials:/app/credentials:ro
+    depends_on:
+      - postgres
+      - redis
+      - agents
+
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GMAIL_CREDENTIALS_PATH=/app/credentials/gmail_credentials.json
+      - DATABASE_URL=postgresql://user:password@postgres:5432/jobtracker
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./agents:/app
+      - ./shared:/app/shared
+      - ./credentials:/app/credentials:ro
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: jobtracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

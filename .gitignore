@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+*.log
+*.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+
+# Credentials
+credentials/
+*.json
+*.pem
+*.key
+
+# Cache
+.cache/
+*.tmp
+*.temp
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+*.cover
+*.py,cover
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Go
+*.test
+*.prof
+
+# Docker
+.dockerignore
+
+# Output files
+outputs/
+*.xlsx
+*.xls
+*.csv
