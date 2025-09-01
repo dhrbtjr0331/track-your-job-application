@@ -69,4 +69,4 @@ outputs/
 *.xls
 *.csv
 
-agents/venv
+./agents/venv
